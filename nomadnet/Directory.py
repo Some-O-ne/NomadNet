@@ -6,6 +6,9 @@ import nomadnet
 import threading
 import RNS.vendor.umsgpack as msgpack
 
+from LXMF import pn_announce_data_is_valid
+from nomadnet.util import strip_modifiers
+
 class PNAnnounceHandler:
     def __init__(self, owner):
         self.aspect_filter = "lxmf.propagation"
@@ -13,10 +16,10 @@ class PNAnnounceHandler:
 
     def received_announce(self, destination_hash, announced_identity, app_data):
         try:
-            if type(app_data) == bytes:
+            if pn_announce_data_is_valid(app_data):
                 data = msgpack.unpackb(app_data)
 
-                if data[0] == True:
+                if data[2] == True:
                     RNS.log("Received active propagation node announce from "+RNS.prettyhexrep(destination_hash))
 
                     associated_peer = RNS.Destination.hash_from_name_and_identity("lxmf.delivery", announced_identity)
@@ -193,7 +196,8 @@ class Directory:
                     found_node = True
                     break
 
-            if not found_node:
+            # TODO: Remove debug and rethink this (needs way to set PN when node is saved)
+            if True or not found_node:
                 if self.app.compact_stream:
                     try:
                         remove_announces = []
@@ -226,7 +230,7 @@ class Directory:
 
     def display_name(self, source_hash):
         if source_hash in self.directory_entries:
-            return self.directory_entries[source_hash].display_name
+            return strip_modifiers(self.directory_entries[source_hash].display_name)
         else:
             return None
 
@@ -238,7 +242,7 @@ class Directory:
                 if dn == None:
                     return RNS.prettyhexrep(source_hash)
                 else:
-                    return dn+" <"+RNS.hexrep(source_hash, delimit=False)+">"
+                    return strip_modifiers(dn)+" <"+RNS.hexrep(source_hash, delimit=False)+">"
             else:
                 return "<"+RNS.hexrep(source_hash, delimit=False)+">"
         else:
@@ -247,13 +251,13 @@ class Directory:
                 if dn == None:
                     return RNS.prettyhexrep(source_hash)
                 else:
-                    return dn
+                    return strip_modifiers(dn)
             else:
                 return "<"+RNS.hexrep(source_hash, delimit=False)+">"
 
     def alleged_display_str(self, source_hash):
         if source_hash in self.directory_entries:
-            return self.directory_entries[source_hash].display_name
+            return strip_modifiers(self.directory_entries[source_hash].display_name)
         else:
             return None
 
