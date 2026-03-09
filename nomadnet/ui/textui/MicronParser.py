@@ -3,6 +3,9 @@ import urwid
 import random
 import time
 import RNS
+import io
+from PIL import Image
+import base64
 from urwid.util import is_mouse_press
 from urwid.text_layout import calc_coords
 
@@ -465,6 +468,7 @@ def make_style(state):
         screen = nomadnet.NomadNetworkApp.get_shared_instance().ui.screen
         screen.register_palette_entry(name, low_color(fg)+format_string,low_color(bg),mono_color(fg, bg)+format_string,high_color(fg)+format_string,high_color(bg))
         
+        
         synth_spec = screen._palette[name]
         SYNTH_STYLES.append(name)
         if not name in SYNTH_SPECS:
@@ -505,6 +509,74 @@ def make_output(state, line, url_delegate, pre_escape=False):
                                 color = line[i+1:i+4]
                                 skip = 3
                             state["fg_color"] = color
+                    elif c == "i":
+                        skip = 3
+                        if line[i+1:i+4] != "mg[": # not `img[
+                            continue
+                        skip += 1
+                        end = line.find("]")
+                        if end == -1 or end < i+4: # well its an invalid img
+                            continue
+                        data = line[i+4:end]
+                        skip += len(data)+1
+                        try:
+                            
+                            
+                            img = Image.open(io.BytesIO(base64.decodebytes(data.replace("\\n","\n").encode()))).convert("RGBA")
+                            
+                            def getfg(color):
+                                nonlocal state
+                                if color != "`f":
+                                    state["fg_color"] = color
+                                else:
+                                    state["fg_color"] = state["default_fg"]
+                                return ""
+                                # if fg == last_fg:
+                                #     fg = ""
+                                # else:
+                                #     last_fg = fg
+                                # return fg
+
+                            def getbg(color):
+                                nonlocal state
+                                if color != "`b":
+                                    state["bg_color"] = color
+
+                                else:
+                                    state["bg_color"] = state["default_bg"]
+                                return ""
+                                # if bg == last_bg:
+                                #     bg = ""
+                                # else:
+                                #     last_bg = bg
+                                # return bg
+
+                            for y in range(0,img.height,2):
+                                for x in range(img.width):
+                                    
+                                    r, g, b,au = img.getpixel((x, y))
+                                    coloru = '{:X}{:X}{:X}'.format(r, g, b)
+
+                                    r, g, b,ad = (0,0,0,0) if y+1 >= img.width else img.getpixel((x, y+1))
+                                    colord = '{:X}{:X}{:X}'.format(r, g, b)
+
+                                    if au > 0 and ad > 0: 
+                                        output.append(make_part(state,f"{getfg(colord)}{getbg(coloru)}▄"))
+                                    elif au > 0 and ad == 0:
+                                        output.append(make_part(state,f"{getfg(coloru)}{getbg('`b')}▀"))
+
+                                    elif au == 0 and ad > 0:
+
+                                        output.append(make_part(state,f"{getfg(colord)}{getbg("`b")}▄"))
+                                    elif au == ad == 0:
+                                        
+                                        output.append(make_part(state,f"{getfg('`f')}{getbg('`b')} "))
+                                        continue
+                                output.append(make_part(state,f"{getfg('`f')}{getbg('`b')}\n"))
+                        except Exception as e:
+                            continue # invalid img data
+
+                        
                     elif c == "f":
                         state["fg_color"] = state["default_fg"]
                     elif c == "B":
